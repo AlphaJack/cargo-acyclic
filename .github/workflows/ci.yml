@@ -1,6 +1,5 @@
 name: CI
 
-# Pull requests run the Linux and macOS jobs. Windows is 3 times slower. It runs on main after a merge and in a merge queue (`merge_group`) if there is one. A skipped job counts as passed for a required check.
 on:
   pull_request:
   merge_group:
@@ -72,16 +71,11 @@ jobs:
         run: cargo package --locked
 
   test:
-    name: test (${{ matrix.os }}, ${{ matrix.toolchain }})
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        toolchain: [stable]
-        include:
-          # rust-version
-          - os: ubuntu-latest
-            toolchain: "1.93"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -91,7 +85,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: "stable"
           components: clippy, rust-analyzer
       - name: Install sccache
         if: vars.CI_USE_SCCACHE == 'true'
@@ -100,7 +94,6 @@ jobs:
         if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: ${{ matrix.toolchain }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         if: runner.os == 'macOS'
@@ -113,8 +106,7 @@ jobs:
         run: cargo nextest run --locked
 
   test-windows:
-    name: test (windows-latest, stable)
-    if: github.event_name != 'pull_request'
+    name: test (windows-latest)
     runs-on: windows-latest
     steps:
       - name: Check out repository

@@ -131,10 +131,21 @@ pub(crate) fn check(mode: &Mode<'_>) -> Result<bool> {
     let (root, crates, config) = (PathBuf::from(&metadata.workspace_root), crates(&metadata), config(&metadata)?);
     let index = edge::index(&root, &PathBuf::from(&metadata.target_directory).join("acyclic"), SETTINGS)?;
     let mut sources: Vec<Vec<Document<String>>> = crates.iter().map(|_| Vec::new()).collect();
+    let mut others = Vec::new();
     for document in documents(&index) {
-        if let Some(k) = crates.iter().position(|k| k.owns(&document.path)) {
-            sources[k].push(document);
+        match crates.iter().position(|k| k.owns(&document.path)) {
+            Some(k) => sources[k].push(document),
+            None => others.push(document.path),
         }
+    }
+    if let Some((krate, _)) = crates.iter().zip(&sources).find(|(_, s)| s.is_empty()) {
+        let count = others.len();
+        others.truncate(3);
+        bail!(
+            "rust-analyzer indexes no file of {} in {}; it indexes {count} other files such as {others:?}",
+            krate.package,
+            krate.dir
+        );
     }
     let mut found = Found::default();
     for (krate, documents) in crates.iter().zip(sources) {
@@ -181,8 +192,10 @@ fn edges_within(graph: &Graph, component: &[String]) -> Vec<(String, String)> {
 /// The workspace's published packages, each with its library, or else its binary named as the package, or else its
 /// first binary.
 fn crates(metadata: &Metadata) -> Vec<Crate> {
+    // SCIP paths use `/` on every system.
     let relative = |path: &cargo_metadata::camino::Utf8Path| {
-        path.strip_prefix(&metadata.workspace_root).map_or_else(|_| path.to_string(), ToString::to_string)
+        let path = path.strip_prefix(&metadata.workspace_root).map_or_else(|_| path.to_string(), ToString::to_string);
+        path.replace('\\', "/")
     };
     let library =
         |t: &&Target| t.kind.iter().any(|k| matches!(k, TargetKind::Lib | TargetKind::RLib | TargetKind::ProcMacro));
@@ -209,9 +222,6 @@ fn crates(metadata: &Metadata) -> Vec<Crate> {
 
 /// A crate's files with only its own symbols, parsed, and what the source text tells.
 fn local(root: &Path, krate: &Crate, documents: Vec<Document<String>>) -> Result<Vec<Document>> {
-    if documents.is_empty() {
-        bail!("rust-analyzer indexes no file of {}", krate.package);
-    }
     // `rust-analyzer cargo cargo-apy 0.1.0 spec/schema/Schema#`.
     let prefix = format!("rust-analyzer cargo {} ", krate.package);
     let local = |symbol: &str| Some(symbol.strip_prefix(&prefix)?.split_once(' ')?.1.to_owned());

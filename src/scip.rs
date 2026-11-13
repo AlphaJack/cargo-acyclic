@@ -49,7 +49,7 @@ pub(crate) fn documents(index: &[u8]) -> Vec<Document<String>> {
             let (mut path, mut occurrences) = (String::new(), Vec::new());
             for field in fields(document) {
                 match field {
-                    (1, Value::Bytes(p)) => path = String::from_utf8_lossy(p).into_owned(),
+                    (1, Value::Bytes(p)) => path = String::from_utf8_lossy(p).replace('\\', "/"),
                     (2, Value::Bytes(o)) => occurrences.extend(occurrence(o)),
                     _ => {}
                 }

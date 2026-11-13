@@ -9,4 +9,3 @@
 ### Fixed
 
 - Match SCIP paths on Windows ([#1](https://github.com/AlphaJack/cargo-acyclic/pull/1))
-# Changelog

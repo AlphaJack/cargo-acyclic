@@ -1,0 +1,8 @@
+[package]
+name = "shop"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata.acyclic]
+allow = [{ cycle = ["shop::Order", "shop::Line"], why = "a cycle that is gone" }]
+layers = ["shop::money", ["shop::cart", "shop::catalog"], "shop::checkout", "shop::basket"]

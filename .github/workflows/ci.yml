@@ -1,0 +1,192 @@
+name: CI
+
+# Pull requests run the Linux and macOS jobs. Windows is 3 times slower. It runs on main after a merge and in a merge queue (`merge_group`) if there is one. A skipped job counts as passed for a required check.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Neither compile cache keeps incremental builds.
+  CARGO_INCREMENTAL: "0"
+  # The compile cache is rust-cache. If the repository variable CI_USE_SCCACHE is true then it is
+  # sccache on the GitHub Actions cache backend.
+  SCCACHE_GHA_ENABLED: ${{ vars.CI_USE_SCCACHE == 'true' }}
+  RUSTC_WRAPPER: ${{ vars.CI_USE_SCCACHE == 'true' && 'sccache' || '' }}
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+          components: clippy, rust-analyzer
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Rustdoc
+        run: cargo doc --no-deps --document-private-items --locked
+      - name: Modules are acyclic
+        run: cargo run --locked -- acyclic
+      - name: The crate packages and builds
+        run: cargo package --locked
+
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.toolchain }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        toolchain: [stable]
+        include:
+          # rust-version
+          - os: ubuntu-latest
+            toolchain: "1.93"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: clippy, rust-analyzer
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ${{ matrix.toolchain }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        if: runner.os == 'macOS'
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest
+      - name: Test
+        run: cargo nextest run --locked
+
+  test-windows:
+    name: test (windows-latest, stable)
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+          components: clippy, rust-analyzer
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Turn off Defender's real-time scanning
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest
+      - name: Test
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: cargo nextest run --locked
+
+  deny:
+    runs-on: ubuntu-latest
+    # The action runs in its own container. That container has no sccache.
+    env:
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  workflows:
+    name: Check workflows
+    runs-on: ubuntu-latest
+    env:
+      ACTIONLINT: v1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: zizmor
+
+      - name: Install actionlint
+        run: |
+          curl -fsSLo actionlint.tgz "https://github.com/rhysd/actionlint/releases/download/$ACTIONLINT/actionlint_${ACTIONLINT#v}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  actionlint.tgz" | sha256sum -c
+          tar xzf actionlint.tgz actionlint
+
+      - name: Run actionlint and zizmor
+        run: |
+          ./actionlint
+          zizmor --offline .

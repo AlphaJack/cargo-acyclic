@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommits",
+    ":automergeMinor"
+  ],
+  "schedule": ["before 6am on monday"],
+  "lockFileMaintenance": { "enabled": true },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "users do not see crate bumps so they stay out of the changelog",
+      "matchDatasources": ["crate"],
+      "semanticCommitType": "chore"
+    },
+    {
+      "description": "dist generates release.yml; update it with `dist init` instead",
+      "matchFileNames": [".github/workflows/release.yml"],
+      "enabled": false
+    }
+  ],
+  "ignorePaths": [".github/workflows/release.yml"],
+  "customManagers": [
+    {
+      "description": "actionlint and the checksum of its archive",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/"],
+      "matchStrings": ["ACTIONLINT: (?<currentValue>\\S+)\\s+ACTIONLINT_SHA256: (?<currentDigest>\\S+)"],
+      "depNameTemplate": "rhysd/actionlint",
+      "datasourceTemplate": "github-release-attachments"
+    }
+  ]
+}

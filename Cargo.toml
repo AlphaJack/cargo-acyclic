@@ -1,0 +1,116 @@
+[package]
+name = "cargo-acyclic"
+description = "Checks that the modules of a Rust workspace have no cycles. It also checks that no function calls up to a parent module and that modules use their layers in order."
+version = "0.1.0"
+edition = "2024"
+# The oldest rust-analyzer whose index tests/shop.rs passes with.
+rust-version = "1.93"
+license = "Apache-2.0"
+repository = "https://github.com/AlphaJack/cargo-acyclic"
+readme = "README.md"
+keywords = ["cargo", "architecture", "modules", "cycles", "layers"]
+categories = ["development-tools::cargo-plugins", "command-line-utilities"]
+# Cargo leaves out tests/shop because it is a package of its own. Without it tests/shop.rs cannot run.
+exclude = [".*", "tests", "clippy.toml", "deny.toml", "rustfmt.toml", "release-plz.toml", "dist-workspace.toml", "CONTRIBUTING.md"]
+
+[dependencies]
+anyhow = "1"
+# The crates of the workspace and their targets. Also the target directory and `[workspace.metadata.acyclic]`.
+cargo_metadata = "0.23"
+# Where function bodies and `extern` blocks are. SCIP does not say.
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "3", features = ["full", "visit"] }
+
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unfulfilled_lint_expectations = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+
+[lints.cargo]
+# A dependency no target uses fails the build.
+unused_dependencies = "deny"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+bare_urls = "deny"
+redundant_explicit_links = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Nursery lints that fight this code base's choices.
+# `pub(crate)` marks what other modules use. This is true inside a private module too.
+redundant_pub_crate = "allow"
+# Each `const fn` is a promise to callers. Here it gives nothing.
+missing_const_for_fn = "allow"
+# `map_or_else` chains read worse than `if let`.
+option_if_let_else = "allow"
+# It flags guards held on purpose across the work they protect.
+significant_drop_tightening = "allow"
+redundant_clone = "warn"
+needless_collect = "warn"
+str_to_string = "warn"
+equatable_if_let = "warn"
+branches_sharing_code = "warn"
+map_err_ignore = "warn"
+allow_attributes_without_reason = "deny"
+allow_attributes = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+dbg_macro = "deny"
+let_underscore_must_use = "deny"
+wildcard_enum_match_arm = "warn"
+string_slice = "warn"
+ref_option = "deny"
+manual_let_else = "deny"
+needless_for_each = "deny"
+return_self_not_must_use = "deny"
+must_use_candidate = "allow"
+# `write!` to a String returns a Result that every call would have to discard.
+format_push_string = "allow"
+format_collect = "allow"
+# A module with children is `foo.rs` next to `foo/`. It is never `foo/mod.rs`.
+mod_module_files = "deny"
+similar_names = "allow"
+# Matches on booleans read as tables of cases.
+match_bool = "allow"
+single_match_else = "allow"
+missing_errors_doc = "allow"
+module_name_repetitions = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = "s"
+
+[profile.dist]
+inherits = "release"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"
+bin-dir = "{ name }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "txz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-fmt = "zip"
+bin-dir = "{ bin }{ binary-ext }"

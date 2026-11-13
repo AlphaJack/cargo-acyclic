@@ -1,0 +1,19 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+too-many-lines-threshold = 80
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "use BTreeMap or Vec: the report must not depend on hash order" },
+  { path = "std::collections::HashSet", reason = "use BTreeSet or Vec: the report must not depend on hash order" },
+]
+disallowed-methods = [
+  { path = "std::thread::sleep", reason = "use condition-based waits" },
+  { path = "std::process::Command::new", reason = "only the edge runs programs" },
+  { path = "std::env::var", reason = "settings come from Cargo.toml and the command line" },
+  { path = "std::env::var_os", reason = "settings come from Cargo.toml and the command line" },
+  { path = "std::fs::read", reason = "only the edge touches files" },
+  { path = "std::fs::read_to_string", reason = "only the edge touches files" },
+  { path = "std::fs::write", reason = "only the edge touches files" },
+  { path = "std::fs::create_dir_all", reason = "only the edge touches files" },
+  { path = "cargo_metadata::MetadataCommand::exec", reason = "only the edge runs programs" },
+]

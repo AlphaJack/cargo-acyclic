@@ -1,0 +1,3 @@
+# A test that hangs fails instead of holding up the run.
+[profile.default]
+slow-timeout = { period = "20s", terminate-after = 3 }

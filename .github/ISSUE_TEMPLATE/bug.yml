@@ -1,0 +1,50 @@
+name: Bug
+description: cargo acyclic reports a problem that is not there. Or it misses a problem or fails.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran and what you expected. Then what happened instead.
+      placeholder: |
+        I ran `cargo acyclic`. I expected no findings, but it reported `shop::cart -> shop::catalog`, which ...
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code
+      description: The smallest code that shows the bug. A link to a public repository is also good.
+      render: rust
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings
+      description: The `[workspace.metadata.acyclic]` or `[package.metadata.acyclic]` table if there is one.
+      render: toml
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Everything `cargo acyclic` printed.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The `cargo-acyclic` line of `cargo install --list` and the output of `rust-analyzer --version`
+      placeholder: cargo-acyclic v0.1.0 and rust-analyzer 1.100.0 (0ef1bc3 2026-11-09)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11
+    validations:
+      required: true
